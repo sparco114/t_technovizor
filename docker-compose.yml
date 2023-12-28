@@ -1,0 +1,60 @@
+version: '3'
+services:
+
+  php_app:
+    build: ./php_app
+    container_name: php_app
+    restart: unless-stopped
+    volumes:
+      - php_app_data:/var/www/html
+    networks:
+      - app-network
+    depends_on:
+      - mariadb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "mariadb"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+    command: ["sh", "-c", "cd tvz && php yii migrate --interactive=0 && php-fpm"]
+
+  webserver_nginx:
+    build: ./nginx
+    container_name: webserver_nginx
+    restart: unless-stopped
+    ports:
+      - 80:80
+    volumes:
+      - php_app_data:/var/www/html
+      # - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - app-network
+    depends_on:
+      - php_app
+
+  mariadb:
+    image: mariadb:latest
+    container_name: mariadb
+    restart: unless-stopped
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_DATABASE: tvz_app_db
+      MYSQL_ROOT_PASSWORD: root_password!
+      SERVICE_TAGS: dev
+      SERVICE_NAME: maria_db
+    volumes:
+      - tvz_dbdata:/var/lib/mysql/
+      - ./db_script.sql:/docker-entrypoint-initdb.d/db_script.sql
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    name: app-network
+
+volumes:
+  tvz_dbdata:
+    driver: local
+  php_app_data:
+    driver: local
